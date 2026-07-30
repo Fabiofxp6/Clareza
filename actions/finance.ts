@@ -403,6 +403,48 @@ export async function createCardAction(formData: FormData): Promise<MutationResu
   return { ok: true };
 }
 
+export async function deleteCardAction(formData: FormData) {
+  const user = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const db = getDb();
+
+  await db.transaction(async (tx) => {
+    const [card] = await tx
+      .select({ id: creditCards.id })
+      .from(creditCards)
+      .where(and(eq(creditCards.id, id), eq(creditCards.userId, user.id)))
+      .limit(1);
+    if (!card) return;
+
+    const linkedTransactions = await tx
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.creditCardId, card.id), eq(transactions.userId, user.id)));
+    for (const transaction of linkedTransactions) {
+      await applyBalance(tx, transaction, -1);
+    }
+
+    await tx
+      .delete(transactions)
+      .where(and(eq(transactions.creditCardId, card.id), eq(transactions.userId, user.id)));
+    await tx
+      .delete(creditCardPurchases)
+      .where(
+        and(
+          eq(creditCardPurchases.creditCardId, card.id),
+          eq(creditCardPurchases.userId, user.id),
+        ),
+      );
+    await tx
+      .delete(creditCards)
+      .where(and(eq(creditCards.id, card.id), eq(creditCards.userId, user.id)));
+  });
+
+  revalidatePath("/");
+  revalidatePath("/cartoes");
+  revalidatePath("/lancamentos");
+}
+
 export async function createPurchaseAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const parsed = purchaseSchema.safeParse(Object.fromEntries(formData));

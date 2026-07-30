@@ -1,4 +1,10 @@
-import { createCardAction, createPurchaseAction, toggleActiveAction } from "@/actions/finance";
+import {
+  createCardAction,
+  createPurchaseAction,
+  deleteCardAction,
+  toggleActiveAction,
+} from "@/actions/finance";
+import { ConfirmButton } from "@/components/confirm-button";
 import { EmptyState, Field, FormDetails, PageHeader, Submit } from "@/components/page";
 import { getCardsData, getMasters } from "@/lib/queries";
 import { formatCurrency, formatPercent, isoDate } from "@/lib/utils";
@@ -18,7 +24,25 @@ export default async function CardsPage() {
             <div className="mt-6 text-2xl font-bold">{formatCurrency(used)}</div><div className="text-xs text-[var(--muted)]">utilizado de {formatCurrency(card.totalLimit)}</div>
             <div className="mt-4 h-2 rounded-full bg-[var(--surface-soft)]"><div className="h-full rounded-full" style={{ width: `${Math.min(100, percent)}%`, background: percent >= 100 ? "var(--danger)" : percent >= 70 ? "var(--warning)" : card.color }} /></div>
             <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs"><div><div className="text-[var(--muted)]">Fecha</div><b>Dia {card.closingDay}</b></div><div><div className="text-[var(--muted)]">Vence</div><b>Dia {card.dueDay}</b></div><div><div className="text-[var(--muted)]">Disponível</div><b>{formatCurrency(card.totalLimit - used)}</b></div></div>
-            <form action={toggleActiveAction} className="mt-4"><input type="hidden" name="id" value={card.id} /><input type="hidden" name="entity" value="card" /><input type="hidden" name="active" value={String(!card.isActive)} /><button className="btn btn-secondary !min-h-8 text-xs">{card.isActive ? "Desativar cartão" : "Reativar cartão"}</button></form>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <form action={toggleActiveAction}>
+                <input type="hidden" name="id" value={card.id} />
+                <input type="hidden" name="entity" value="card" />
+                <input type="hidden" name="active" value={String(!card.isActive)} />
+                <button className={`btn !min-h-8 text-xs ${card.isActive ? "btn-danger" : "btn-success"}`}>
+                  {card.isActive ? "Desativar cartão" : "Reativar cartão"}
+                </button>
+              </form>
+              <form action={deleteCardAction}>
+                <input type="hidden" name="id" value={card.id} />
+                <ConfirmButton
+                  message={`Excluir o cartão "${card.name}" e todas as compras e parcelas vinculadas? Esta ação não pode ser desfeita.`}
+                  className="btn btn-danger !min-h-8 text-xs"
+                >
+                  Excluir cartão
+                </ConfirmButton>
+              </form>
+            </div>
           </div>;
         })}
       </div>
