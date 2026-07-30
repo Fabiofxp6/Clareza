@@ -408,37 +408,30 @@ export async function deleteCardAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const db = getDb();
 
-  await db.transaction(async (tx) => {
-    const [card] = await tx
-      .select({ id: creditCards.id })
-      .from(creditCards)
-      .where(and(eq(creditCards.id, id), eq(creditCards.userId, user.id)))
-      .limit(1);
-    if (!card) return;
+  const [card] = await db
+    .select({ id: creditCards.id })
+    .from(creditCards)
+    .where(and(eq(creditCards.id, id), eq(creditCards.userId, user.id)))
+    .limit(1);
+  if (!card) return;
 
-    const linkedTransactions = await tx
-      .select()
-      .from(transactions)
-      .where(and(eq(transactions.creditCardId, card.id), eq(transactions.userId, user.id)));
-    for (const transaction of linkedTransactions) {
-      await applyBalance(tx, transaction, -1);
-    }
-
-    await tx
-      .delete(transactions)
-      .where(and(eq(transactions.creditCardId, card.id), eq(transactions.userId, user.id)));
-    await tx
-      .delete(creditCardPurchases)
-      .where(
-        and(
-          eq(creditCardPurchases.creditCardId, card.id),
-          eq(creditCardPurchases.userId, user.id),
-        ),
-      );
-    await tx
-      .delete(creditCards)
-      .where(and(eq(creditCards.id, card.id), eq(creditCards.userId, user.id)));
-  });
+  // The Neon HTTP driver does not support interactive transactions. Each step
+  // is idempotent so a retry can safely finish an interrupted deletion.
+  await db
+    .delete(creditCardPurchases)
+    .where(
+      and(
+        eq(creditCardPurchases.creditCardId, card.id),
+        eq(creditCardPurchases.userId, user.id),
+      ),
+    );
+  await db
+    .update(transactions)
+    .set({ creditCardId: null, updatedAt: new Date() })
+    .where(and(eq(transactions.creditCardId, card.id), eq(transactions.userId, user.id)));
+  await db
+    .delete(creditCards)
+    .where(and(eq(creditCards.id, card.id), eq(creditCards.userId, user.id)));
 
   revalidatePath("/");
   revalidatePath("/cartoes");
