@@ -1,7 +1,7 @@
 "use server";
 
 import { addMonths, getMonth, getYear, setDate } from "date-fns";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, type Database } from "@/db";
 import {
@@ -35,6 +35,7 @@ import {
 } from "@/schemas/finance";
 
 type MutationResult = { ok: true } | { ok: false; error: string };
+export type AccountMutationState = { ok?: boolean; error?: string; message?: string };
 
 function optional(value?: string) {
   return value || null;
@@ -252,6 +253,108 @@ export async function createAccountAction(formData: FormData): Promise<MutationR
     currentBalance: balance,
     color: parsed.data.color,
   });
+  revalidatePath("/configuracoes");
+  return { ok: true };
+}
+
+export async function updateAccountAction(
+  _previousState: AccountMutationState,
+  formData: FormData,
+): Promise<AccountMutationState> {
+  const user = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const parsed = accountSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const db = getDb();
+  const [existing] = await db
+    .select({ initialBalance: accounts.initialBalance })
+    .from(accounts)
+    .where(and(eq(accounts.id, id), eq(accounts.userId, user.id)))
+    .limit(1);
+  if (!existing) return { error: "Conta bancária não encontrada." };
+
+  const data = parsed.data;
+  const initialBalance = parseMoneyToCents(data.initialBalance);
+  const balanceDifference = initialBalance - existing.initialBalance;
+  await db
+    .update(accounts)
+    .set({
+      name: data.name,
+      institution: data.institution || null,
+      type: data.type,
+      initialBalance,
+      currentBalance: sql`${accounts.currentBalance} + ${balanceDifference}`,
+      color: data.color,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(accounts.id, id), eq(accounts.userId, user.id)));
+
+  revalidatePath("/");
+  revalidatePath("/configuracoes");
+  revalidatePath("/lancamentos");
+  return { ok: true };
+}
+
+export async function toggleAccountAction(
+  _previousState: AccountMutationState,
+  formData: FormData,
+): Promise<AccountMutationState> {
+  const user = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const db = getDb();
+  const [existing] = await db
+    .select({ isActive: accounts.isActive })
+    .from(accounts)
+    .where(and(eq(accounts.id, id), eq(accounts.userId, user.id)))
+    .limit(1);
+  if (!existing) return { error: "Conta bancária não encontrada." };
+
+  await db
+    .update(accounts)
+    .set({ isActive: !existing.isActive, updatedAt: new Date() })
+    .where(and(eq(accounts.id, id), eq(accounts.userId, user.id)));
+  revalidatePath("/");
+  revalidatePath("/configuracoes");
+  return { ok: true, message: existing.isActive ? "Conta desativada." : "Conta reativada." };
+}
+
+export async function deleteAccountAction(
+  _previousState: AccountMutationState,
+  formData: FormData,
+): Promise<AccountMutationState> {
+  const user = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(and(eq(accounts.id, id), eq(accounts.userId, user.id)))
+    .limit(1);
+  if (!existing) return { error: "Conta bancária não encontrada." };
+
+  const [linked] = await db
+    .select({ total: sql<number>`count(*)` })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, user.id),
+        or(eq(transactions.accountId, id), eq(transactions.destinationAccountId, id)),
+      ),
+    );
+  const linkedTransactions = Number(linked?.total ?? 0);
+  if (linkedTransactions > 0) {
+    return {
+      error: `Esta conta possui ${linkedTransactions} lançamento${linkedTransactions === 1 ? "" : "s"} vinculado${linkedTransactions === 1 ? "" : "s"}. Desative a conta para preservar o histórico financeiro.`,
+    };
+  }
+
+  await db
+    .delete(accounts)
+    .where(and(eq(accounts.id, id), eq(accounts.userId, user.id)));
+  revalidatePath("/");
   revalidatePath("/configuracoes");
   return { ok: true };
 }

@@ -7,11 +7,11 @@ import {
   createWalletAction,
   updateSettingsAction,
 } from "@/actions/finance";
+import { AccountManager } from "@/components/account-manager";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import { DangerZone } from "@/components/danger-zone";
 import { Field, FormDetails, PageHeader, SectionTitle, Submit } from "@/components/page";
 import { getSettingsData } from "@/lib/queries";
-import { formatCurrency } from "@/lib/utils";
 
 export default async function SettingsPage() {
   const data = await getSettingsData();
@@ -35,9 +35,10 @@ export default async function SettingsPage() {
       <div className="flex items-end"><Submit>Salvar parâmetros</Submit></div>
     </form></section>
     <div className="grid gap-4 lg:grid-cols-2">
-      <FormDetails title="Adicionar conta bancária">
+      <FormDetails title="Contas bancárias">
+        <h3 className="mb-3 text-sm font-semibold">Adicionar nova conta</h3>
         <form action={saveAccount} className="grid gap-4 sm:grid-cols-2"><Field label="Nome"><input className="field" name="name" required /></Field><Field label="Instituição"><input className="field" name="institution" /></Field><Field label="Tipo"><select className="field" name="type"><option value="CHECKING">Conta corrente</option><option value="SAVINGS">Poupança</option><option value="PAYMENT">Conta de pagamento</option><option value="INVESTMENT">Investimentos</option><option value="OTHER">Outra</option></select></Field><Field label="Saldo inicial"><input className="field" name="initialBalance" defaultValue="0,00" /></Field><Field label="Cor"><input className="field" name="color" type="color" defaultValue="#6366f1" /></Field><div className="flex items-end"><Submit>Adicionar conta</Submit></div></form>
-        <div className="mt-5 space-y-2">{data.accounts.map((item) => <div className="flex justify-between rounded-xl bg-[var(--surface-soft)] p-3 text-sm" key={item.id}><span className="font-semibold">{item.name}</span><span>{formatCurrency(item.currentBalance)}</span></div>)}</div>
+        <AccountManager accounts={data.accounts} />
       </FormDetails>
       <FormDetails title="Adicionar categoria">
         <form action={saveCategory} className="grid gap-4 sm:grid-cols-2"><Field label="Nome"><input className="field" name="name" required /></Field><Field label="Tipo"><select className="field" name="type"><option value="EXPENSE">Despesa</option><option value="INCOME">Receita</option><option value="INVESTMENT">Investimento</option></select></Field><Field label="Grupo"><select className="field" name="budgetGroup"><option value="NEEDS">Necessidades</option><option value="WANTS">Desejos</option><option value="INVESTMENTS">Investimentos</option><option value="DEBTS">Dívidas</option></select></Field><Field label="Cor"><input className="field" name="color" type="color" defaultValue="#64748b" /></Field><input type="hidden" name="icon" value="circle" /><div className="flex items-end"><Submit>Adicionar categoria</Submit></div></form>
