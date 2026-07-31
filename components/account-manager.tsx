@@ -8,6 +8,7 @@ import {
   updateAccountAction,
   type AccountMutationState,
 } from "@/actions/finance";
+import { RequiredMark } from "@/components/page";
 import type { Account } from "@/db/schema";
 import { formatCurrency } from "@/lib/utils";
 
@@ -38,11 +39,17 @@ function AccountItem({ account }: { account: Account }) {
 
   useEffect(() => {
     if (updateState.ok) toast.success("Conta atualizada.");
+    if (updateState.error) toast.error("Não foi possível atualizar a conta.", { description: updateState.error });
   }, [updateState]);
 
   useEffect(() => {
     if (toggleState.ok && toggleState.message) toast.success(toggleState.message);
+    if (toggleState.error) toast.error("Não foi possível alterar a conta.", { description: toggleState.error });
   }, [toggleState]);
+
+  useEffect(() => {
+    if (deleteState.error) toast.error("Não foi possível excluir a conta.", { description: deleteState.error });
+  }, [deleteState]);
 
   return (
     <div className="rounded-xl border bg-[var(--surface-soft)] p-3 text-sm">
@@ -111,7 +118,7 @@ function AccountItem({ account }: { account: Account }) {
         <form action={updateAction} className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
           <input type="hidden" name="id" value={account.id} />
           <label className="label">
-            Nome
+            <span>Nome<RequiredMark /></span>
             <input className="field" name="name" defaultValue={account.name} required />
           </label>
           <label className="label">
@@ -119,15 +126,15 @@ function AccountItem({ account }: { account: Account }) {
             <input className="field" name="institution" defaultValue={account.institution ?? ""} />
           </label>
           <label className="label">
-            Tipo
-            <select className="field" name="type" defaultValue={account.type}>
+            <span>Tipo<RequiredMark /></span>
+            <select className="field" name="type" defaultValue={account.type} required>
               {Object.entries(accountTypeLabel).map(([value, label]) => (
                 <option value={value} key={value}>{label}</option>
               ))}
             </select>
           </label>
           <label className="label">
-            Saldo inicial
+            <span>Saldo inicial<RequiredMark /></span>
             <input
               className="field"
               name="initialBalance"
@@ -137,8 +144,8 @@ function AccountItem({ account }: { account: Account }) {
             />
           </label>
           <label className="label">
-            Cor
-            <input className="field h-11" name="color" type="color" defaultValue={account.color} />
+            <span>Cor<RequiredMark /></span>
+            <input className="field h-11" name="color" type="color" defaultValue={account.color} required />
           </label>
           <div className="flex items-end">
             <button className="btn btn-primary" disabled={updatePending}>

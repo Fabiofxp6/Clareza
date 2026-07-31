@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { FormValidationToasts } from "@/components/form-validation-toasts";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
 import "./globals.css";
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
+          <FormValidationToasts />
           <Toaster richColors position="top-right" />
         </ThemeProvider>
       </body>

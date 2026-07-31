@@ -1,4 +1,5 @@
 import { upsertBudgetAction } from "@/actions/finance";
+import { MutationForm } from "@/components/mutation-form";
 import { Field, FormDetails, PageHeader, Submit } from "@/components/page";
 import { budgetLevel } from "@/lib/finance";
 import { getBudgetData, getMasters } from "@/lib/queries";
@@ -13,7 +14,6 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
   const totalPlanned = data.rows.reduce((sum, row) => sum + row.planned, 0);
   const totalRealized = data.rows.reduce((sum, row) => sum + row.realized, 0);
   const config = data.settings;
-  async function save(formData: FormData) { "use server"; await upsertBudgetAction(formData); }
   return (
     <>
       <PageHeader
@@ -49,12 +49,12 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
       <FormDetails title="Planejar categoria">
-        <form action={save} className="grid gap-4 sm:grid-cols-4">
+        <MutationForm action={upsertBudgetAction} successMessage="Orçamento salvo." className="grid gap-4 sm:grid-cols-4">
           <Field label="Categoria"><select className="field" name="categoryId" required>{masters.categories.filter((item) => item.type === "EXPENSE").map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></Field>
           <Field label="Valor planejado"><input className="field" name="plannedAmount" required placeholder="0,00" /></Field>
           <input type="hidden" name="month" value={month} /><input type="hidden" name="year" value={year} />
           <div className="flex items-end"><Submit>Salvar orçamento</Submit></div>
-        </form>
+        </MutationForm>
       </FormDetails>
       <section className="card table-wrap">
         <table className="data-table">

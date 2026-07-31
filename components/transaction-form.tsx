@@ -1,21 +1,18 @@
 import { createTransactionAction, updateTransactionAction } from "@/actions/finance";
+import { MutationForm } from "@/components/mutation-form";
 import { Field, Submit } from "@/components/page";
 import { isoDate } from "@/lib/utils";
 import type { AwaitedReturn } from "@/types/helpers";
 import type { Transaction } from "@/db/schema";
 
 export function TransactionForm({ masters, transaction }: { masters: AwaitedReturn<typeof import("@/lib/queries").getMasters>; transaction?: Transaction }) {
-  async function action(formData: FormData) {
-    "use server";
-    if (formData.get("id")) await updateTransactionAction(formData);
-    else await createTransactionAction(formData);
-  }
+  const action = transaction ? updateTransactionAction : createTransactionAction;
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <MutationForm action={action} successMessage={transaction ? "Lançamento atualizado." : "Lançamento adicionado."} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {transaction && <input type="hidden" name="id" value={transaction.id} />}
       <Field label="Data"><input className="field" name="date" type="date" defaultValue={transaction?.date ?? isoDate()} required /></Field>
       <Field label="Tipo">
-        <select className="field" name="type" defaultValue={transaction?.type ?? "EXPENSE"}>
+        <select className="field" name="type" defaultValue={transaction?.type ?? "EXPENSE"} required>
           <option value="INCOME">Receita</option><option value="EXPENSE">Despesa</option><option value="INVESTMENT">Investimento</option><option value="TRANSFER">Transferência</option>
         </select>
       </Field>
@@ -46,7 +43,7 @@ export function TransactionForm({ masters, transaction }: { masters: AwaitedRetu
         <select className="field" name="creditCardId" defaultValue={transaction?.creditCardId ?? ""}><option value="">Nenhum</option>{masters.creditCards.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>
       </Field>
       <Field label="Situação">
-        <select className="field" name="status" defaultValue={transaction?.status ?? "PENDING"}><option value="PENDING">Pendente</option><option value="PAID">Pago</option><option value="RECEIVED">Recebido</option><option value="OVERDUE">Atrasado</option><option value="CANCELED">Cancelado</option></select>
+        <select className="field" name="status" defaultValue={transaction?.status ?? "PENDING"} required><option value="PENDING">Pendente</option><option value="PAID">Pago</option><option value="RECEIVED">Recebido</option><option value="OVERDUE">Atrasado</option><option value="CANCELED">Cancelado</option></select>
       </Field>
       <Field label="Vencimento"><input className="field" name="dueDate" type="date" defaultValue={transaction?.dueDate ?? ""} /></Field>
       <Field label="Data de pagamento/recebimento"><input className="field" name="paymentDate" type="date" defaultValue={transaction?.paymentDate ?? ""} /></Field>
@@ -54,6 +51,6 @@ export function TransactionForm({ masters, transaction }: { masters: AwaitedRetu
       <label className="flex items-center gap-2 self-end pb-3 text-sm"><input name="isEssential" type="checkbox" value="true" defaultChecked={transaction?.isEssential} /> Essencial</label>
       <Field label="Observações"><textarea className="field min-h-24" name="notes" defaultValue={transaction?.notes ?? ""} /></Field>
       <div className="flex items-end"><Submit>{transaction ? "Salvar alterações" : "Adicionar lançamento"}</Submit></div>
-    </form>
+    </MutationForm>
   );
 }

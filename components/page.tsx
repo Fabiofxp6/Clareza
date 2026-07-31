@@ -1,4 +1,5 @@
 import { ChevronRight } from "lucide-react";
+import { Children, isValidElement } from "react";
 import { SubmitButton } from "@/components/submit-button";
 
 export function PageHeader({
@@ -57,7 +58,10 @@ export function FormDetails({
         {title}
         <ChevronRight className="transition-transform group-open:rotate-90" size={18} />
       </summary>
-      <div className="border-t p-4 sm:p-5">{children}</div>
+      <div className="border-t p-4 sm:p-5">
+        <p className="mb-4 text-xs text-[var(--muted)]"><RequiredMark /> Campos obrigatórios</p>
+        {children}
+      </div>
     </details>
   );
 }
@@ -65,11 +69,20 @@ export function FormDetails({
 export function Field({
   label,
   children,
+  required,
 }: {
   label: string;
   children: React.ReactNode;
+  required?: boolean;
 }) {
-  return <label className="label">{label}{children}</label>;
+  const isRequired = required ?? Children.toArray(children).some((child) => (
+    isValidElement(child) && Boolean((child.props as { required?: boolean }).required)
+  ));
+  return <label className="label"><span>{label}{isRequired && <RequiredMark />}</span>{children}</label>;
+}
+
+export function RequiredMark() {
+  return <span className="ml-1 text-[var(--danger)]" aria-hidden="true">*</span>;
 }
 
 export function Submit({ children = "Salvar" }: { children?: React.ReactNode }) {

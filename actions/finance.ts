@@ -44,7 +44,7 @@ import {
   walletSchema,
 } from "@/schemas/finance";
 
-type MutationResult = { ok: true } | { ok: false; error: string };
+export type MutationResult = { ok: true; message?: string } | { ok: false; error: string };
 export type AccountMutationState = { ok?: boolean; error?: string; message?: string };
 
 function optional(value?: string) {
@@ -207,16 +207,20 @@ export async function updateTransactionAction(formData: FormData): Promise<Mutat
   return { ok: true };
 }
 
-export async function updateTransactionStatusAction(formData: FormData) {
+export async function updateTransactionStatusAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "") as Transaction["status"];
   const paymentDate = String(formData.get("paymentDate") ?? isoDate());
-  if (!isUuid(id) || !["PAID", "RECEIVED", "PENDING", "CANCELED"].includes(status) || !isIsoDate(paymentDate)) return;
+  if (!isUuid(id) || !["PAID", "RECEIVED", "PENDING", "CANCELED"].includes(status) || !isIsoDate(paymentDate)) {
+    return { ok: false, error: "Situação ou data de liquidação inválida." };
+  }
   const db = getDb();
   const [existing] = await db.select().from(transactions).where(and(eq(transactions.id, id), eq(transactions.userId, user.id))).limit(1);
-  if (!existing) return;
-  if ((existing.type === "INCOME" && status === "PAID") || (existing.type !== "INCOME" && status === "RECEIVED")) return;
+  if (!existing) return { ok: false, error: "Lançamento não encontrado." };
+  if ((existing.type === "INCOME" && status === "PAID") || (existing.type !== "INCOME" && status === "RECEIVED")) {
+    return { ok: false, error: existing.type === "INCOME" ? "Receitas devem ser marcadas como recebidas." : "Somente receitas podem ser marcadas como recebidas." };
+  }
   const changes = { status, paymentDate: ["PAID", "RECEIVED"].includes(status) ? paymentDate : null, updatedAt: new Date() };
   const updated: BalanceRecord = { ...existing, ...changes };
   await runBatch(db, [
@@ -226,34 +230,36 @@ export async function updateTransactionStatusAction(formData: FormData) {
   ]);
   revalidatePath("/");
   revalidatePath("/lancamentos");
+  return { ok: true };
 }
 
-export async function deleteTransactionAction(formData: FormData) {
+export async function deleteTransactionAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const id = String(formData.get("id") ?? "");
-  if (!isUuid(id)) return;
+  if (!isUuid(id)) return { ok: false, error: "Lançamento inválido." };
   const db = getDb();
   const [existing] = await db.select().from(transactions).where(and(eq(transactions.id, id), eq(transactions.userId, user.id))).limit(1);
-  if (!existing) return;
+  if (!existing) return { ok: false, error: "Lançamento não encontrado." };
   await runBatch(db, [
     ...balanceQueries(db, user.id, existing, -1),
     db.delete(transactions).where(and(eq(transactions.id, id), eq(transactions.userId, user.id))),
   ]);
   revalidatePath("/");
   revalidatePath("/lancamentos");
+  return { ok: true };
 }
 
-export async function duplicateTransactionAction(formData: FormData) {
+export async function duplicateTransactionAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const id = String(formData.get("id") ?? "");
-  if (!isUuid(id)) return;
+  if (!isUuid(id)) return { ok: false, error: "Lançamento inválido." };
   const db = getDb();
   const [existing] = await db
     .select()
     .from(transactions)
     .where(and(eq(transactions.id, id), eq(transactions.userId, user.id)))
     .limit(1);
-  if (!existing) return;
+  if (!existing) return { ok: false, error: "Lançamento não encontrado." };
   const { id: _, createdAt: __, updatedAt: ___, ...copy } = existing;
   void _;
   void __;
@@ -265,6 +271,7 @@ export async function duplicateTransactionAction(formData: FormData) {
     paymentDate: null,
   });
   revalidatePath("/lancamentos");
+  return { ok: true };
 }
 
 export async function createAccountAction(formData: FormData): Promise<MutationResult> {
@@ -390,10 +397,10 @@ export async function deleteAccountAction(
   return { ok: true };
 }
 
-export async function createWalletAction(formData: FormData) {
+export async function createWalletAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const parsed = walletSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return;
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   const balance = parseMoneyToCents(parsed.data.initialBalance);
   await getDb().insert(wallets).values({
     userId: user.id,
@@ -402,6 +409,7 @@ export async function createWalletAction(formData: FormData) {
     currentBalance: balance,
   });
   revalidatePath("/configuracoes");
+  return { ok: true };
 }
 
 export async function createCategoryAction(formData: FormData): Promise<MutationResult> {
@@ -413,23 +421,25 @@ export async function createCategoryAction(formData: FormData): Promise<Mutation
   return { ok: true };
 }
 
-export async function createSubcategoryAction(formData: FormData) {
+export async function createSubcategoryAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const parsed = subcategorySchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return;
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   const db = getDb();
   const [category] = await db.select({ id: categories.id }).from(categories).where(and(eq(categories.id, parsed.data.categoryId), eq(categories.userId, user.id))).limit(1);
-  if (!category) return;
+  if (!category) return { ok: false, error: "Categoria não encontrada." };
   await db.insert(subcategories).values({ userId: user.id, ...parsed.data });
   revalidatePath("/configuracoes");
+  return { ok: true };
 }
 
-export async function createPaymentMethodAction(formData: FormData) {
+export async function createPaymentMethodAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const parsed = paymentMethodSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return;
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   await getDb().insert(paymentMethods).values({ userId: user.id, name: parsed.data.name });
   revalidatePath("/configuracoes");
+  return { ok: true };
 }
 
 export async function upsertBudgetAction(formData: FormData): Promise<MutationResult> {
@@ -494,10 +504,10 @@ export async function createFixedExpenseAction(formData: FormData): Promise<Muta
   return { ok: true };
 }
 
-export async function generateFixedExpenseAction(formData: FormData) {
+export async function generateFixedExpenseAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const parsed = fixedExpenseGenerationSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return;
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Período inválido." };
   const { id, month, year } = parsed.data;
   const db = getDb();
   const [fixed] = await db
@@ -505,7 +515,7 @@ export async function generateFixedExpenseAction(formData: FormData) {
     .from(fixedExpenses)
     .where(and(eq(fixedExpenses.id, id), eq(fixedExpenses.userId, user.id)))
     .limit(1);
-  if (!fixed) return;
+  if (!fixed) return { ok: false, error: "Conta fixa não encontrada." };
   const due = isoDateForMonthDay(year, month, fixed.dueDay);
   await db
     .insert(transactions)
@@ -529,6 +539,7 @@ export async function generateFixedExpenseAction(formData: FormData) {
     .onConflictDoNothing();
   revalidatePath("/contas-fixas");
   revalidatePath("/lancamentos");
+  return { ok: true };
 }
 
 export async function createCardAction(formData: FormData): Promise<MutationResult> {
@@ -550,10 +561,10 @@ export async function createCardAction(formData: FormData): Promise<MutationResu
   return { ok: true };
 }
 
-export async function deleteCardAction(formData: FormData) {
+export async function deleteCardAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const id = String(formData.get("id") ?? "");
-  if (!isUuid(id)) return;
+  if (!isUuid(id)) return { ok: false, error: "Cartão inválido." };
   const db = getDb();
 
   const [card] = await db
@@ -561,7 +572,7 @@ export async function deleteCardAction(formData: FormData) {
     .from(creditCards)
     .where(and(eq(creditCards.id, id), eq(creditCards.userId, user.id)))
     .limit(1);
-  if (!card) return;
+  if (!card) return { ok: false, error: "Cartão não encontrado." };
 
   await runBatch(db, [
     db.delete(creditCardPurchases).where(
@@ -577,6 +588,7 @@ export async function deleteCardAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/cartoes");
   revalidatePath("/lancamentos");
+  return { ok: true };
 }
 
 export async function createPurchaseAction(formData: FormData): Promise<MutationResult> {
@@ -709,10 +721,10 @@ export async function updateSettingsAction(formData: FormData): Promise<Mutation
   return { ok: true };
 }
 
-export async function updateGoalProgressAction(formData: FormData) {
+export async function updateGoalProgressAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const parsed = goalProgressSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return;
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   const { id, status } = parsed.data;
   const currentAmount = parseMoneyToCents(parsed.data.currentAmount);
   await getDb()
@@ -721,31 +733,38 @@ export async function updateGoalProgressAction(formData: FormData) {
     .where(and(eq(financialGoals.id, id), eq(financialGoals.userId, user.id)));
   revalidatePath("/metas");
   revalidatePath("/");
+  return { ok: true };
 }
 
-export async function updateDebtProgressAction(formData: FormData) {
+export async function updateDebtProgressAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const parsed = debtProgressSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return;
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   const { id, paidInstallments, status } = parsed.data;
   const currentBalance = parseMoneyToCents(parsed.data.currentBalance);
   const db = getDb();
   const [debt] = await db.select({ totalInstallments: debts.totalInstallments }).from(debts).where(and(eq(debts.id, id), eq(debts.userId, user.id))).limit(1);
-  if (!debt || (debt.totalInstallments !== null && paidInstallments > debt.totalInstallments)) return;
+  if (!debt) return { ok: false, error: "Dívida não encontrada." };
+  if (debt.totalInstallments !== null && paidInstallments > debt.totalInstallments) {
+    return { ok: false, error: "As parcelas pagas não podem superar o total de parcelas." };
+  }
   await db
     .update(debts)
     .set({ currentBalance, paidInstallments, status, updatedAt: new Date() })
     .where(and(eq(debts.id, id), eq(debts.userId, user.id)));
   revalidatePath("/dividas");
   revalidatePath("/");
+  return { ok: true };
 }
 
-export async function toggleActiveAction(formData: FormData) {
+export async function toggleActiveAction(formData: FormData): Promise<MutationResult> {
   const user = await requireUser();
   const id = String(formData.get("id") ?? "");
   const entity = String(formData.get("entity") ?? "");
   const isActive = formData.get("active") === "true";
-  if (!isUuid(id) || !["card", "fixed", "account", "wallet", "category"].includes(entity)) return;
+  if (!isUuid(id) || !["card", "fixed", "account", "wallet", "category"].includes(entity)) {
+    return { ok: false, error: "Cadastro inválido." };
+  }
   const db = getDb();
   if (entity === "card")
     await db.update(creditCards).set({ isActive, updatedAt: new Date() }).where(and(eq(creditCards.id, id), eq(creditCards.userId, user.id)));
@@ -760,4 +779,5 @@ export async function toggleActiveAction(formData: FormData) {
   revalidatePath("/configuracoes");
   revalidatePath("/cartoes");
   revalidatePath("/contas-fixas");
+  return { ok: true };
 }

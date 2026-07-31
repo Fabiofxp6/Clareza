@@ -76,15 +76,16 @@ export async function changePasswordAction(
   return { ok: true };
 }
 
-export async function updateProfileAction(formData: FormData) {
+export async function updateProfileAction(formData: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
   const parsed = profileSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return;
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   const db = getDb();
   const [duplicate] = await db.select({ id: users.id }).from(users).where(and(eq(users.email, parsed.data.email), ne(users.id, user.id))).limit(1);
-  if (duplicate) return;
+  if (duplicate) return { ok: false, error: "Este e-mail já está em uso." };
   await db
     .update(users)
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(users.id, user.id));
+  return { ok: true };
 }

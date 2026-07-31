@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { RequiredMark } from "@/components/page";
 
 export function BackupForm() {
   const [summary, setSummary] = useState<string | null>(null);
@@ -33,10 +34,10 @@ export function BackupForm() {
     }
   }
   return <form onSubmit={restore} className="space-y-4">
-    <label className="label">Arquivo JSON<input className="field" name="file" type="file" accept="application/json,.json" required onChange={(event) => inspect(event.target.files?.[0])} /></label>
+    <label className="label"><span>Arquivo JSON<RequiredMark /></span><input className="field" name="file" type="file" accept="application/json,.json" required onChange={(event) => inspect(event.target.files?.[0])} /></label>
     {summary && <p className="rounded-xl bg-[var(--surface-soft)] p-3 text-xs text-[var(--muted)]">{summary}</p>}
-    <label className="label">Estratégia<select className="field" name="mode"><option value="replace">Substituir todos os dados financeiros</option><option value="merge">Mesclar por identificador</option></select></label>
-    <label className="label">Confirme sua senha<input className="field" name="password" type="password" autoComplete="current-password" maxLength={200} required /></label>
+    <label className="label"><span>Estratégia<RequiredMark /></span><select className="field" name="mode" required><option value="replace">Substituir todos os dados financeiros</option><option value="merge">Mesclar por identificador</option></select></label>
+    <label className="label"><span>Confirme sua senha<RequiredMark /></span><input className="field" name="password" type="password" autoComplete="current-password" maxLength={200} required /></label>
     <button className="btn btn-danger" disabled={busy}>{busy ? "Restaurando…" : "Validar e restaurar"}</button>
   </form>;
 }

@@ -5,6 +5,7 @@ import {
   updateTransactionStatusAction,
 } from "@/actions/finance";
 import { ConfirmButton } from "@/components/confirm-button";
+import { MutationForm } from "@/components/mutation-form";
 import { EmptyState, FormDetails, PageHeader } from "@/components/page";
 import { TransactionForm } from "@/components/transaction-form";
 import { getMasters, getTransactions, type TransactionFilters } from "@/lib/queries";
@@ -59,15 +60,15 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
                     <td>
                       <div className="flex gap-1">
                         {transaction.status === "PENDING" && (
-                          <form action={updateTransactionStatusAction}>
+                          <MutationForm action={updateTransactionStatusAction} successMessage="Lançamento liquidado.">
                             <input type="hidden" name="id" value={transaction.id} />
                             <input type="hidden" name="status" value={transaction.type === "INCOME" ? "RECEIVED" : "PAID"} />
                             <button className="btn btn-secondary !min-h-8 !px-2 text-xs">Liquidar</button>
-                          </form>
+                          </MutationForm>
                         )}
                         <Link className="btn btn-secondary !min-h-8 !px-2 text-xs" href={`/lancamentos/${transaction.id}/editar`}>Editar</Link>
-                        <form action={duplicateTransactionAction}><input type="hidden" name="id" value={transaction.id} /><button className="btn btn-secondary !min-h-8 !px-2 text-xs">Duplicar</button></form>
-                        <form action={deleteTransactionAction}><input type="hidden" name="id" value={transaction.id} /><ConfirmButton message="Excluir este lançamento e recalcular o saldo?" className="btn btn-danger !min-h-8 !px-2 text-xs">Excluir</ConfirmButton></form>
+                        <MutationForm action={duplicateTransactionAction} successMessage="Lançamento duplicado."><input type="hidden" name="id" value={transaction.id} /><button className="btn btn-secondary !min-h-8 !px-2 text-xs">Duplicar</button></MutationForm>
+                        <MutationForm action={deleteTransactionAction} successMessage="Lançamento excluído."><input type="hidden" name="id" value={transaction.id} /><ConfirmButton message="Excluir este lançamento e recalcular o saldo?" className="btn btn-danger !min-h-8 !px-2 text-xs">Excluir</ConfirmButton></MutationForm>
                       </div>
                     </td>
                   </tr>
