@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
 
-const palette = ["#5557e8", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
+const palette = ["#22c55e", "#38bdf8", "#facc15", "#ef4444", "#94a3b8", "#273244"];
 
 function MoneyTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
@@ -58,13 +58,13 @@ export function DashboardCharts({
       <section className="card p-5">
         <h2 className="font-bold">Receitas versus despesas</h2>
         <p className="mt-1 text-xs text-[var(--muted)]">Evolução dos últimos meses com dados realizados.</p>
-        <div className="mt-5 h-72">
+        <div className="mt-5 h-72" role="img" aria-label="Gráfico da evolução mensal de receitas e despesas realizadas">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={monthly}>
               <defs>
                 <linearGradient id="income" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.24} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.24} />
+                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="expenses" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#ef4444" stopOpacity={0.18} />
@@ -75,7 +75,7 @@ export function DashboardCharts({
               <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
               <YAxis hide />
               <Tooltip content={<MoneyTooltip />} />
-              <Area name="Receitas" type="monotone" dataKey="income" stroke="#10b981" fill="url(#income)" strokeWidth={2} />
+              <Area name="Receitas" type="monotone" dataKey="income" stroke="#22c55e" fill="url(#income)" strokeWidth={2} />
               <Area name="Despesas" type="monotone" dataKey="expenses" stroke="#ef4444" fill="url(#expenses)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
@@ -84,19 +84,19 @@ export function DashboardCharts({
       <section className="card p-5">
         <h2 className="font-bold">Despesas por categoria</h2>
         <p className="mt-1 text-xs text-[var(--muted)]">Onde seu dinheiro foi utilizado neste mês.</p>
-        <div className="mt-5 grid min-h-72 items-center gap-3 sm:grid-cols-[1fr_1fr]">
+        <div className="mt-5 grid min-h-72 items-center gap-3 sm:grid-cols-[1fr_1fr]" role="img" aria-label="Gráfico e lista das despesas por categoria">
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
               <Pie data={categories} dataKey="value" nameKey="name" innerRadius={62} outerRadius={96} paddingAngle={3}>
-                {categories.map((entry, index) => <Cell key={entry.name} fill={entry.color || palette[index % palette.length]} />)}
+                {categories.map((entry, index) => <Cell key={entry.name} fill={palette[index % palette.length]} />)}
               </Pie>
               <Tooltip content={<MoneyTooltip />} />
             </PieChart>
           </ResponsiveContainer>
           <div className="space-y-2">
-            {categories.slice(0, 7).map((item) => (
+            {categories.slice(0, 7).map((item, index) => (
               <div className="flex items-center justify-between gap-3 text-xs" key={item.name}>
-                <span className="flex items-center gap-2 text-[var(--muted)]"><i className="h-2 w-2 rounded-full" style={{ background: item.color }} />{item.name}</span>
+                <span className="flex items-center gap-2 text-[var(--muted)]"><i className="h-2 w-2 rounded-full" style={{ background: palette[index % palette.length] }} />{item.name}</span>
                 <strong>{formatCurrency(item.value)}</strong>
               </div>
             ))}
@@ -107,14 +107,14 @@ export function DashboardCharts({
       <section className="card p-5">
         <h2 className="font-bold">Saldo mensal</h2>
         <p className="mt-1 text-xs text-[var(--muted)]">Resultado entre entradas, despesas e aportes.</p>
-        <div className="mt-5 h-64">
+        <div className="mt-5 h-64" role="img" aria-label="Gráfico do saldo financeiro mensal">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthly}>
               <CartesianGrid stroke="var(--border)" vertical={false} />
               <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
               <YAxis hide />
               <Tooltip content={<MoneyTooltip />} />
-              <Bar name="Saldo" dataKey="balance" fill="#5557e8" radius={[6, 6, 2, 2]} />
+              <Bar name="Saldo" dataKey="balance" fill="#22c55e" radius={[6, 6, 2, 2]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

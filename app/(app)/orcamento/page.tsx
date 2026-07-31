@@ -2,13 +2,13 @@ import { upsertBudgetAction } from "@/actions/finance";
 import { Field, FormDetails, PageHeader, Submit } from "@/components/page";
 import { budgetLevel } from "@/lib/finance";
 import { getBudgetData, getMasters } from "@/lib/queries";
-import { formatCurrency, formatPercent, monthLabel } from "@/lib/utils";
+import { clampInteger, formatCurrency, formatPercent, monthLabel } from "@/lib/utils";
 
 export default async function BudgetPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string }> }) {
   const params = await searchParams;
   const now = new Date();
-  const month = Number(params.month) || now.getMonth() + 1;
-  const year = Number(params.year) || now.getFullYear();
+  const month = clampInteger(params.month, now.getMonth() + 1, 1, 12);
+  const year = clampInteger(params.year, now.getFullYear(), 2000, 2200);
   const [data, masters] = await Promise.all([getBudgetData(month, year), getMasters()]);
   const totalPlanned = data.rows.reduce((sum, row) => sum + row.planned, 0);
   const totalRealized = data.rows.reduce((sum, row) => sum + row.realized, 0);
@@ -23,7 +23,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
         actions={
           <form className="flex gap-2">
             <select className="field" name="month" defaultValue={month}>{Array.from({ length: 12 }, (_, i) => <option value={i + 1} key={i}>{monthLabel(i + 1)}</option>)}</select>
-            <input className="field w-24" name="year" type="number" defaultValue={year} />
+            <input className="field w-24" name="year" type="number" min="2000" max="2200" defaultValue={year} />
             <button className="btn btn-secondary">Aplicar</button>
           </form>
         }

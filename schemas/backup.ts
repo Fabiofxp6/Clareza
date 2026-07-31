@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const recordArray = z.array(z.record(z.string(), z.unknown()));
+const recordArray = z.array(z.record(z.string(), z.unknown())).max(100_000);
 
 export const financialBackupV1Schema = z.object({
   version: z.literal(1),

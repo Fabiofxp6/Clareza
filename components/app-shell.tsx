@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { logoutAction } from "@/actions/auth";
 import { cn } from "@/lib/utils";
@@ -43,10 +44,11 @@ export function AppShell({
   user,
   children,
 }: {
-  user: { name: string; email: string };
+  user: { name: string; email: string; theme: "LIGHT" | "DARK" | "SYSTEM" | null };
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { setTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobile, setMobile] = useState(false);
   useEffect(() => {
@@ -55,6 +57,22 @@ export function AppShell({
     });
     return () => cancelAnimationFrame(frame);
   }, []);
+  useEffect(() => {
+    setTheme((user.theme ?? "SYSTEM").toLowerCase());
+  }, [setTheme, user.theme]);
+  useEffect(() => {
+    if (!mobile) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobile(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobile]);
   const toggle = () => {
     const next = !collapsed;
     setCollapsed(next);
@@ -64,13 +82,14 @@ export function AppShell({
     <div className="min-h-screen lg:grid" style={{ gridTemplateColumns: collapsed ? "84px 1fr" : "252px 1fr" }}>
       {mobile && <button className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setMobile(false)} aria-label="Fechar menu" />}
       <aside
+        id="main-navigation"
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex w-[252px] flex-col border-r bg-[var(--surface)] transition-transform lg:sticky lg:top-0 lg:h-screen lg:w-auto lg:translate-x-0",
           mobile ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="flex h-[74px] items-center gap-3 border-b px-5">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--primary)] text-white">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--primary)] text-[#f8fafc]">
             <WalletCards size={19} />
           </div>
           {!collapsed && (
@@ -90,6 +109,7 @@ export function AppShell({
                 href={href}
                 title={collapsed ? label : undefined}
                 onClick={() => setMobile(false)}
+                aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
                   active
@@ -119,7 +139,7 @@ export function AppShell({
       </aside>
       <div className="min-w-0">
         <header className="sticky top-0 z-20 flex h-[74px] items-center border-b bg-[color-mix(in_srgb,var(--background)_88%,transparent)] px-4 backdrop-blur-xl sm:px-6 lg:px-8">
-          <button className="btn btn-secondary mr-3 h-10 w-10 !p-0 lg:hidden" onClick={() => setMobile(true)} aria-label="Abrir menu"><Menu size={18} /></button>
+          <button className="btn btn-secondary mr-3 h-10 w-10 !p-0 lg:hidden" onClick={() => setMobile(true)} aria-label="Abrir menu" aria-expanded={mobile} aria-controls="main-navigation"><Menu size={18} /></button>
           <button className="hidden h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface)] lg:grid" onClick={toggle} aria-label={collapsed ? "Expandir menu" : "Recolher menu"}>
             {collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
           </button>

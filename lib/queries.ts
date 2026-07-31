@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, ilike, lte, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, lt, lte, ne, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   accounts,
@@ -17,6 +17,7 @@ import {
   wallets,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { clampInteger, isIsoDate, isUuid, isoDate, isoDateForMonthDay } from "@/lib/utils";
 
 export async function getMasters() {
   const user = await requireUser();
@@ -59,11 +60,18 @@ function period(month: number, year: number) {
 export async function getDashboardData(month: number, year: number) {
   const user = await requireUser();
   const db = getDb();
+  const now = new Date();
+  month = clampInteger(month, now.getMonth() + 1, 1, 12);
+  year = clampInteger(year, now.getFullYear(), 2000, 2200);
   const { start, end } = period(month, year);
+  const historyDate = new Date(Date.UTC(year, month - 8, 1));
+  const historyStart = isoDateForMonthDay(historyDate.getUTCFullYear(), historyDate.getUTCMonth() + 1, 1);
+  const today = isoDate(now);
+  const fiveDaysFromNow = isoDate(new Date(now.getTime() + 5 * 86_400_000));
   const realized = and(
     eq(transactions.userId, user.id),
     gte(transactions.paymentDate, start),
-    lte(transactions.paymentDate, end),
+    lt(transactions.paymentDate, end),
   );
 
   const [
@@ -95,7 +103,10 @@ export async function getDashboardData(month: number, year: number) {
       .from(transactions)
       .where(realized),
     db
-      .select({ total: sql<number>`coalesce(sum(${accounts.currentBalance}), 0)` })
+      .select({
+        total: sql<number>`coalesce(sum(${accounts.currentBalance}), 0)`,
+        investment: sql<number>`coalesce(sum(case when ${accounts.type} = 'INVESTMENT' then ${accounts.currentBalance} else 0 end), 0)`,
+      })
       .from(accounts)
       .where(and(eq(accounts.userId, user.id), eq(accounts.isActive, true))),
     db
@@ -144,7 +155,8 @@ export async function getDashboardData(month: number, year: number) {
       .where(
         and(
           eq(transactions.userId, user.id),
-          gte(transactions.paymentDate, `${year - 1}-01-01`),
+          gte(transactions.paymentDate, historyStart),
+          lt(transactions.paymentDate, end),
           ne(transactions.status, "CANCELED"),
         ),
       )
@@ -175,11 +187,8 @@ export async function getDashboardData(month: number, year: number) {
         and(
           eq(transactions.userId, user.id),
           eq(transactions.status, "PENDING"),
-          gte(transactions.dueDate, new Date().toISOString().slice(0, 10)),
-          lte(
-            transactions.dueDate,
-            new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10),
-          ),
+          gte(transactions.dueDate, today),
+          lte(transactions.dueDate, fiveDaysFromNow),
         ),
       ),
     db
@@ -209,7 +218,7 @@ export async function getDashboardData(month: number, year: number) {
           eq(transactions.type, "EXPENSE"),
           eq(transactions.status, "PAID"),
           gte(transactions.paymentDate, start),
-          lte(transactions.paymentDate, end),
+          lt(transactions.paymentDate, end),
         ),
       )
       .where(
@@ -237,7 +246,7 @@ export async function getDashboardData(month: number, year: number) {
       .where(
         and(
           eq(debts.userId, user.id),
-          lte(debts.nextDueDate, new Date().toISOString().slice(0, 10)),
+          lte(debts.nextDueDate, today),
           ne(debts.status, "PAID"),
         ),
       ),
@@ -254,17 +263,7 @@ export async function getDashboardData(month: number, year: number) {
   const goalCurrent = Number(goalRows[0]?.current ?? 0);
   const goalTarget = Number(goalRows[0]?.target ?? 0);
   const emergencyTarget = Number(settingsRows[0]?.emergencyFundTarget ?? 0);
-  const investmentAccounts = await db
-    .select({ total: sql<number>`coalesce(sum(${accounts.currentBalance}), 0)` })
-    .from(accounts)
-    .where(
-      and(
-        eq(accounts.userId, user.id),
-        eq(accounts.type, "INVESTMENT"),
-        eq(accounts.isActive, true),
-      ),
-    );
-  const emergency = Number(investmentAccounts[0]?.total ?? 0);
+  const emergency = Number(accountRows[0]?.investment ?? 0);
 
   const alerts: { level: "danger" | "warning" | "info"; title: string; detail: string }[] = [];
   if (income - expenses - investments < 0)
@@ -354,23 +353,25 @@ export type TransactionFilters = {
 export async function getTransactions(filters: TransactionFilters) {
   const user = await requireUser();
   const db = getDb();
-  const page = Math.max(1, Number(filters.page) || 1);
+  const page = clampInteger(filters.page, 1, 1, 1_000_000);
   const conditions = [eq(transactions.userId, user.id)];
   if (filters.q) conditions.push(ilike(transactions.description, `%${filters.q.slice(0, 80)}%`));
   if (["INCOME", "EXPENSE", "INVESTMENT", "TRANSFER"].includes(filters.type ?? ""))
     conditions.push(eq(transactions.type, filters.type as typeof transactions.type.enumValues[number]));
   if (["PAID", "RECEIVED", "PENDING", "OVERDUE", "CANCELED"].includes(filters.status ?? ""))
     conditions.push(eq(transactions.status, filters.status as typeof transactions.status.enumValues[number]));
-  if (filters.category) conditions.push(eq(transactions.categoryId, filters.category));
-  if (filters.subcategory) conditions.push(eq(transactions.subcategoryId, filters.subcategory));
-  if (filters.account) conditions.push(eq(transactions.accountId, filters.account));
-  if (filters.paymentMethod) conditions.push(eq(transactions.paymentMethodId, filters.paymentMethod));
-  if (filters.card) conditions.push(eq(transactions.creditCardId, filters.card));
-  if (filters.from) conditions.push(gte(transactions.date, filters.from));
-  if (filters.to) conditions.push(lte(transactions.date, filters.to));
-  if (filters.month && filters.year) {
-    const { start, end } = period(Number(filters.month), Number(filters.year));
-    conditions.push(gte(transactions.date, start), lte(transactions.date, end));
+  if (isUuid(filters.category)) conditions.push(eq(transactions.categoryId, filters.category));
+  if (isUuid(filters.subcategory)) conditions.push(eq(transactions.subcategoryId, filters.subcategory));
+  if (isUuid(filters.account)) conditions.push(eq(transactions.accountId, filters.account));
+  if (isUuid(filters.paymentMethod)) conditions.push(eq(transactions.paymentMethodId, filters.paymentMethod));
+  if (isUuid(filters.card)) conditions.push(eq(transactions.creditCardId, filters.card));
+  if (isIsoDate(filters.from)) conditions.push(gte(transactions.date, filters.from));
+  if (isIsoDate(filters.to)) conditions.push(lte(transactions.date, filters.to));
+  const filterMonth = Number(filters.month);
+  const filterYear = Number(filters.year);
+  if (Number.isInteger(filterMonth) && filterMonth >= 1 && filterMonth <= 12 && Number.isInteger(filterYear) && filterYear >= 2000 && filterYear <= 2200) {
+    const { start, end } = period(filterMonth, filterYear);
+    conditions.push(gte(transactions.date, start), lt(transactions.date, end));
   }
   const where = and(...conditions);
   const ordering =
@@ -406,6 +407,7 @@ export async function getTransactions(filters: TransactionFilters) {
 
 export async function getTransaction(id: string) {
   const user = await requireUser();
+  if (!isUuid(id)) return undefined;
   const [row] = await getDb()
     .select()
     .from(transactions)
@@ -417,6 +419,9 @@ export async function getTransaction(id: string) {
 export async function getBudgetData(month: number, year: number) {
   const user = await requireUser();
   const db = getDb();
+  const now = new Date();
+  month = clampInteger(month, now.getMonth() + 1, 1, 12);
+  year = clampInteger(year, now.getFullYear(), 2000, 2200);
   const { start, end } = period(month, year);
   const [rows, config] = await Promise.all([
     db
@@ -502,6 +507,12 @@ export async function getDebts() {
   return getDb().select().from(debts).where(eq(debts.userId, user.id)).orderBy(desc(debts.priority));
 }
 
+export async function getFinancialSettings() {
+  const user = await requireUser();
+  const [config] = await getDb().select().from(settings).where(eq(settings.userId, user.id)).limit(1);
+  return config;
+}
+
 export async function getSettingsData() {
   const user = await requireUser();
   const db = getDb();
@@ -514,6 +525,7 @@ export async function getSettingsData() {
 
 export async function getAnnualData(year: number) {
   const user = await requireUser();
+  year = clampInteger(year, new Date().getFullYear(), 2000, 2200);
   const rows = await getDb()
     .select({
       month: sql<number>`extract(month from ${transactions.paymentDate})`,
@@ -527,7 +539,7 @@ export async function getAnnualData(year: number) {
       and(
         eq(transactions.userId, user.id),
         gte(transactions.paymentDate, `${year}-01-01`),
-        lte(transactions.paymentDate, `${year + 1}-01-01`),
+        lt(transactions.paymentDate, `${year + 1}-01-01`),
       ),
     )
     .groupBy(sql`extract(month from ${transactions.paymentDate})`)

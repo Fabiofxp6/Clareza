@@ -1,6 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db";
@@ -24,8 +25,10 @@ import { deleteSession, requireUser } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
 
 type State = { ok?: boolean; error?: string };
+type PgBatchItem = BatchItem<"pg">;
 
 async function confirmPassword(userId: string, password: string) {
+  if (!password || password.length > 200) return false;
   const [record] = await getDb().select().from(users).where(eq(users.id, userId)).limit(1);
   return Boolean(record && (await verifyPassword(record.passwordHash, password)));
 }
@@ -36,22 +39,23 @@ export async function resetFinancialDataAction(_: State, formData: FormData): Pr
     return { error: "Senha atual incorreta." };
   }
   const db = getDb();
-  await db.transaction(async (tx) => {
-    await tx.delete(transactions).where(eq(transactions.userId, user.id));
-    await tx.delete(creditCardPurchases).where(eq(creditCardPurchases.userId, user.id));
-    await tx.delete(monthlyBudgets).where(eq(monthlyBudgets.userId, user.id));
-    await tx.delete(fixedExpenses).where(eq(fixedExpenses.userId, user.id));
-    await tx.delete(financialGoals).where(eq(financialGoals.userId, user.id));
-    await tx.delete(debts).where(eq(debts.userId, user.id));
-    await tx.delete(subcategories).where(eq(subcategories.userId, user.id));
-    await tx.delete(paymentMethods).where(eq(paymentMethods.userId, user.id));
-    await tx.delete(creditCards).where(eq(creditCards.userId, user.id));
-    await tx.delete(categories).where(eq(categories.userId, user.id));
-    await tx.delete(wallets).where(eq(wallets.userId, user.id));
-    await tx.delete(accounts).where(eq(accounts.userId, user.id));
-    await tx.delete(settings).where(eq(settings.userId, user.id));
-    await tx.insert(settings).values({ userId: user.id });
-  });
+  const queries: [PgBatchItem, ...PgBatchItem[]] = [
+    db.delete(transactions).where(eq(transactions.userId, user.id)),
+    db.delete(creditCardPurchases).where(eq(creditCardPurchases.userId, user.id)),
+    db.delete(monthlyBudgets).where(eq(monthlyBudgets.userId, user.id)),
+    db.delete(fixedExpenses).where(eq(fixedExpenses.userId, user.id)),
+    db.delete(financialGoals).where(eq(financialGoals.userId, user.id)),
+    db.delete(debts).where(eq(debts.userId, user.id)),
+    db.delete(subcategories).where(eq(subcategories.userId, user.id)),
+    db.delete(paymentMethods).where(eq(paymentMethods.userId, user.id)),
+    db.delete(creditCards).where(eq(creditCards.userId, user.id)),
+    db.delete(categories).where(eq(categories.userId, user.id)),
+    db.delete(wallets).where(eq(wallets.userId, user.id)),
+    db.delete(accounts).where(eq(accounts.userId, user.id)),
+    db.delete(settings).where(eq(settings.userId, user.id)),
+    db.insert(settings).values({ userId: user.id }),
+  ];
+  await db.batch(queries);
   revalidatePath("/");
   return { ok: true };
 }

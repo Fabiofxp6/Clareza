@@ -1,13 +1,13 @@
 import { createFixedExpenseAction, generateFixedExpenseAction, toggleActiveAction } from "@/actions/finance";
 import { EmptyState, Field, FormDetails, PageHeader, Submit } from "@/components/page";
 import { getFixedExpenses, getMasters } from "@/lib/queries";
-import { formatCurrency, monthLabel } from "@/lib/utils";
+import { clampInteger, formatCurrency, monthLabel } from "@/lib/utils";
 
 export default async function FixedExpensesPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string }> }) {
   const params = await searchParams;
   const now = new Date();
-  const month = Number(params.month) || now.getMonth() + 1;
-  const year = Number(params.year) || now.getFullYear();
+  const month = clampInteger(params.month, now.getMonth() + 1, 1, 12);
+  const year = clampInteger(params.year, now.getFullYear(), 2000, 2200);
   const [rows, masters] = await Promise.all([getFixedExpenses(), getMasters()]);
   async function save(formData: FormData) { "use server"; await createFixedExpenseAction(formData); }
   return (

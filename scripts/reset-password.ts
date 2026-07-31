@@ -38,11 +38,12 @@ async function hiddenPrompt(message: string) {
 const [user] = await scriptDb.select().from(users).limit(1);
 if (!user) throw new Error("Nenhum usuário encontrado.");
 const password = await hiddenPrompt(`Nova senha para ${user.email}: `);
-if (password.length < 12) throw new Error("A senha deve ter pelo menos 12 caracteres.");
+if (password.length < 12 || password.length > 200) throw new Error("A senha deve ter entre 12 e 200 caracteres.");
 const confirmation = await hiddenPrompt("Repita a nova senha: ");
 if (password !== confirmation) throw new Error("As senhas não coincidem.");
-await scriptDb.transaction(async (tx) => {
-  await tx.update(users).set({ passwordHash: await hashPassword(password), updatedAt: new Date() }).where(eq(users.id, user.id));
-  await tx.delete(sessions).where(eq(sessions.userId, user.id));
-});
+const passwordHash = await hashPassword(password);
+await scriptDb.batch([
+  scriptDb.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, user.id)),
+  scriptDb.delete(sessions).where(eq(sessions.userId, user.id)),
+]);
 console.log("Senha redefinida e sessões revogadas.");

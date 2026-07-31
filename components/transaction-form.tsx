@@ -36,6 +36,9 @@ export function TransactionForm({ masters, transaction }: { masters: AwaitedRetu
       <Field label="Conta de destino">
         <select className="field" name="destinationAccountId" defaultValue={transaction?.destinationAccountId ?? ""}><option value="">Nenhuma</option>{masters.accounts.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>
       </Field>
+      <Field label="Carteira de destino">
+        <select className="field" name="destinationWalletId" defaultValue={transaction?.destinationWalletId ?? ""}><option value="">Nenhuma</option>{masters.wallets.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>
+      </Field>
       <Field label="Forma de pagamento">
         <select className="field" name="paymentMethodId" defaultValue={transaction?.paymentMethodId ?? ""}><option value="">Não informada</option>{masters.paymentMethods.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>
       </Field>

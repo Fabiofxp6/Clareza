@@ -14,7 +14,7 @@ import {
 import { DashboardCharts } from "@/components/dashboard-charts";
 import { PageHeader, SectionTitle } from "@/components/page";
 import { getDashboardData } from "@/lib/queries";
-import { formatCurrency, formatPercent, monthLabel } from "@/lib/utils";
+import { clampInteger, formatCurrency, formatPercent, monthLabel } from "@/lib/utils";
 
 export default async function DashboardPage({
   searchParams,
@@ -23,8 +23,8 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const now = new Date();
-  const month = Math.min(12, Math.max(1, Number(params.month) || now.getMonth() + 1));
-  const year = Math.min(2200, Math.max(2000, Number(params.year) || now.getFullYear()));
+  const month = clampInteger(params.month, now.getMonth() + 1, 1, 12);
+  const year = clampInteger(params.year, now.getFullYear(), 2000, 2200);
   const data = await getDashboardData(month, year);
   const cards = [
     { label: "Receita total", value: formatCurrency(data.income), icon: ArrowUpRight, tone: "var(--success)" },
@@ -79,7 +79,7 @@ export default async function DashboardPage({
             ))}
           </div>
         ) : (
-          <div className="rounded-xl bg-emerald-500/8 p-4 text-sm text-[var(--success)]">Tudo sob controle neste período.</div>
+          <div className="rounded-xl bg-[color-mix(in_srgb,var(--success)_8%,transparent)] p-4 text-sm text-[var(--success)]">Tudo sob controle neste período.</div>
         )}
       </section>
       <DashboardCharts

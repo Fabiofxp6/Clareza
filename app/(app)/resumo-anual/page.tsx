@@ -1,10 +1,10 @@
 import { AnnualCharts } from "@/components/annual-chart";
 import { PageHeader } from "@/components/page";
 import { getAnnualData } from "@/lib/queries";
-import { formatCurrency, formatPercent, monthLabel } from "@/lib/utils";
+import { clampInteger, formatCurrency, formatPercent, monthLabel } from "@/lib/utils";
 
 export default async function AnnualPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
-  const year = Number((await searchParams).year) || new Date().getFullYear();
+  const year = clampInteger((await searchParams).year, new Date().getFullYear(), 2000, 2200);
   const data = await getAnnualData(year);
   const income = data.reduce((sum, item) => sum + item.income, 0);
   const expenses = data.reduce((sum, item) => sum + item.expenses, 0);
@@ -12,7 +12,7 @@ export default async function AnnualPage({ searchParams }: { searchParams: Promi
   const best = data.reduce((a, b) => a.balance > b.balance ? a : b);
   const worst = data.reduce((a, b) => a.expenses > b.expenses ? a : b);
   return <>
-    <PageHeader eyebrow="Evolução" title={`Resumo anual de ${year}`} description="Compare os meses e identifique os períodos de maior gasto e economia." actions={<form className="flex gap-2"><input className="field w-28" name="year" type="number" defaultValue={year} /><button className="btn btn-secondary">Aplicar</button></form>} />
+    <PageHeader eyebrow="Evolução" title={`Resumo anual de ${year}`} description="Compare os meses e identifique os períodos de maior gasto e economia." actions={<form className="flex gap-2"><input className="field w-28" name="year" type="number" min="2000" max="2200" defaultValue={year} /><button className="btn btn-secondary">Aplicar</button></form>} />
     <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
       {[["Receita anual", formatCurrency(income)], ["Despesa anual", formatCurrency(expenses)], ["Saldo anual", formatCurrency(income - expenses - investments)], ["Média de gastos", formatCurrency(expenses / 12)], ["Maior gasto", monthLabel(worst.month)], ["Taxa de poupança", formatPercent(income ? (income - expenses) / income * 100 : 0)]].map(([label, value]) => <div className="card p-4" key={label}><div className="text-xs text-[var(--muted)]">{label}</div><div className="mt-2 truncate text-lg font-bold">{value}</div></div>)}
     </div>

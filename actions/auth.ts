@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, eq, gt } from "drizzle-orm";
+import { and, count, eq, gt, ne } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db";
 import { loginAttempts, users } from "@/db/schema";
@@ -12,7 +12,7 @@ import {
   revokeUserSessions,
 } from "@/lib/auth";
 import { hashPassword, verifyPassword } from "@/lib/password";
-import { loginSchema } from "@/schemas/finance";
+import { loginSchema, profileSchema } from "@/schemas/finance";
 
 export type ActionState = { ok?: boolean; error?: string };
 
@@ -59,7 +59,9 @@ export async function changePasswordAction(
   const user = await requireUser();
   const currentPassword = String(formData.get("currentPassword") ?? "");
   const newPassword = String(formData.get("newPassword") ?? "");
-  if (newPassword.length < 12) return { error: "A nova senha deve ter pelo menos 12 caracteres." };
+  if (currentPassword.length > 200 || newPassword.length < 12 || newPassword.length > 200) {
+    return { error: "A nova senha deve ter entre 12 e 200 caracteres." };
+  }
   const db = getDb();
   const [record] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
   if (!record || !(await verifyPassword(record.passwordHash, currentPassword))) {
@@ -76,11 +78,13 @@ export async function changePasswordAction(
 
 export async function updateProfileAction(formData: FormData) {
   const user = await requireUser();
-  const name = String(formData.get("name") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
-  await getDb()
+  const parsed = profileSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+  const db = getDb();
+  const [duplicate] = await db.select({ id: users.id }).from(users).where(and(eq(users.email, parsed.data.email), ne(users.id, user.id))).limit(1);
+  if (duplicate) return;
+  await db
     .update(users)
-    .set({ name, email, updatedAt: new Date() })
+    .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(users.id, user.id));
 }

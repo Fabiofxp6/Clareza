@@ -1,4 +1,5 @@
 import { ChevronRight } from "lucide-react";
+import { SubmitButton } from "@/components/submit-button";
 
 export function PageHeader({
   eyebrow,
@@ -72,5 +73,5 @@ export function Field({
 }
 
 export function Submit({ children = "Salvar" }: { children?: React.ReactNode }) {
-  return <button className="btn btn-primary" type="submit">{children}</button>;
+  return <SubmitButton>{children}</SubmitButton>;
 }

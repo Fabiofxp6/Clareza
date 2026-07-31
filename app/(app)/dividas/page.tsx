@@ -1,15 +1,15 @@
 import { createDebtAction, updateDebtProgressAction } from "@/actions/finance";
 import { DebtSimulator } from "@/components/debt-simulator";
 import { EmptyState, Field, FormDetails, PageHeader, Submit } from "@/components/page";
-import { getDebts, getSettingsData } from "@/lib/queries";
+import { getDebts, getFinancialSettings } from "@/lib/queries";
 import { formatCurrency, formatPercent, isoDate } from "@/lib/utils";
 
 export default async function DebtsPage() {
-  const [debts, config] = await Promise.all([getDebts(), getSettingsData()]);
+  const [debts, config] = await Promise.all([getDebts(), getFinancialSettings()]);
   const total = debts.filter((item) => item.status !== "PAID").reduce((sum, item) => sum + item.currentBalance, 0);
   const original = debts.reduce((sum, item) => sum + item.originalAmount, 0);
-  const monthly = debts.reduce((sum, item) => sum + (item.installmentAmount ?? 0), 0);
-  const income = config.settings?.monthlyIncome ?? 0;
+  const monthly = debts.filter((item) => item.status !== "PAID").reduce((sum, item) => sum + (item.installmentAmount ?? 0), 0);
+  const income = config?.monthlyIncome ?? 0;
   async function save(formData: FormData) { "use server"; await createDebtAction(formData); }
   return (
     <>

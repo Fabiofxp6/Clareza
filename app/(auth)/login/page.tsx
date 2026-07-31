@@ -9,7 +9,7 @@ export default function LoginPage() {
     <main className="grid min-h-screen place-items-center p-4">
       <div className="w-full max-w-[420px]">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-[var(--primary)] text-white shadow-lg shadow-indigo-500/20">
+          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-[var(--primary)] text-[#f8fafc] shadow-lg shadow-[color-mix(in_srgb,var(--primary)_20%,transparent)]">
             <WalletCards size={23} />
           </div>
           <h1 className="text-3xl font-bold tracking-[-0.04em]">Bem-vindo ao Clareza</h1>
