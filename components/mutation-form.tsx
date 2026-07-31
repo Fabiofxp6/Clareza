@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { startTransition, useActionState, useEffect } from "react";
 import { toast } from "sonner";
 
 type Result = { ok: true; message?: string } | { ok: false; error: string } | void;
@@ -10,12 +10,13 @@ export function MutationForm({
   action,
   successMessage,
   children,
+  onSubmit,
   ...props
 }: Omit<React.ComponentProps<"form">, "action"> & {
   action: (formData: FormData) => Promise<Result>;
   successMessage?: string;
 }) {
-  const [state, formAction] = useActionState(async (previous: State, formData: FormData): Promise<State> => {
+  const [state, formAction, pending] = useActionState(async (previous: State, formData: FormData): Promise<State> => {
     try {
       const result = await action(formData);
       if (result && !result.ok) {
@@ -41,5 +42,17 @@ export function MutationForm({
     else toast.error("Não foi possível salvar.", { description: state.error });
   }, [state]);
 
-  return <form action={formAction} {...props}>{children}</form>;
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    onSubmit?.(event);
+    if (event.defaultPrevented) return;
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    startTransition(() => formAction(formData));
+  }
+
+  return (
+    <form {...props} action={formAction} onSubmit={submit} aria-busy={pending || undefined}>
+      <fieldset className="contents" disabled={pending}>{children}</fieldset>
+    </form>
+  );
 }
